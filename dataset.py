@@ -1,39 +1,18 @@
-#%% Load Dataframe
 import pandas as pd
-DATA_PATH = "data/raw/HIV.csv"
-data = pd.read_csv(DATA_PATH)
-data.head()
-
-#%% General information about the dataset
-print(data.shape)
-print(data["HIV_active"].value_counts())
-
-#%% Show sample molecules
 import rdkit
 from rdkit import Chem
 from rdkit.Chem import Draw
-
-sample_smiles = data["smiles"][4:30].values
-sample_mols = [Chem.MolFromSmiles(smiles) for \
-                smiles in sample_smiles]
-grid = Draw.MolsToGridImage(sample_mols,
-                    molsPerRow=4,
-                    subImgSize=(200,200))
-grid
-
-#%% Quick check with versions
 import torch
 import torch_geometric
-print(f"Torch version: {torch.__version__}")
-print(f"Cuda available: {torch.cuda.is_available()}")
-print(f"Torch geometric version: {torch_geometric.__version__}")
-
-#%% Generate a dataset
 from torch_geometric.data import Dataset, Data
 import numpy as np 
 import os
 from rdkit.Chem import rdmolops
 from tqdm import tqdm
+
+print(f"Torch version: {torch.__version__}")
+print(f"Cuda available: {torch.cuda.is_available()}")
+print(f"Torch geometric version: {torch_geometric.__version__}")
 
 class MoleculeDataset(Dataset):
     def __init__(self, root, transform=None, pre_transform=None):
@@ -128,7 +107,7 @@ class MoleculeDataset(Dataset):
 
     def _get_adjacency_info(self, mol):
         adj_matrix = rdmolops.GetAdjacencyMatrix(mol)
-        row, col = np.where(adj_matrix)
+        row, col = np.where(np.triu(adj_matrix))
         coo = np.array(list(zip(row, col)))
         coo = np.reshape(coo, (2, -1))
         return torch.tensor(coo, dtype=torch.long)
@@ -148,12 +127,5 @@ class MoleculeDataset(Dataset):
                                  f'data_{idx}.pt'))
         return data
 
-#%% Test the dataset
-dataset = MoleculeDataset(root="data/")
 
-# %%
-print(dataset[0].edge_index.t())
-print(dataset[0].x)
-print(dataset[0].edge_attr)
-print(dataset[0].y)
-# %%
+
