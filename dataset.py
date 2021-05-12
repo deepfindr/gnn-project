@@ -99,18 +99,27 @@ class MoleculeDataset(Dataset):
             edge_feats.append(bond.GetBondTypeAsDouble())
             # Feature 2: Rings
             edge_feats.append(bond.IsInRing())
-            # Append node features to matrix
-            all_edge_feats.append(edge_feats)
+            # Append node features to matrix (twice, per direction)
+            all_edge_feats += [edge_feats, edge_feats]
 
         all_edge_feats = np.asarray(all_edge_feats)
         return torch.tensor(all_edge_feats, dtype=torch.float)
 
     def _get_adjacency_info(self, mol):
-        adj_matrix = rdmolops.GetAdjacencyMatrix(mol)
-        row, col = np.where(np.triu(adj_matrix))
-        coo = np.array(list(zip(row, col)))
-        coo = np.reshape(coo, (2, -1))
-        return torch.tensor(coo, dtype=torch.long)
+        """
+        We could also use rdmolops.GetAdjacencyMatrix(mol)
+        but we want to be sure that the order of the indices
+        matches the order for the edge features
+        """
+        edge_indices = []
+        for bond in mol.GetBonds():
+            i = bond.GetBeginAtomIdx()
+            j = bond.GetEndAtomIdx()
+            edge_indices += [[i, j], [j, i]]
+
+        edge_indices = torch.tensor(edge_indices)
+        edge_indices = edge_indices.t().to(torch.long).view(2, -1)
+        return edge_indices
 
     def _get_labels(self, label):
         label = np.asarray([label])
