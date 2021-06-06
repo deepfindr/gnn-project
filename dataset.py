@@ -7,12 +7,17 @@ import torch_geometric
 from torch_geometric.data import Dataset, Data
 import numpy as np 
 import os
-from rdkit.Chem import rdmolops
 from tqdm import tqdm
 
 print(f"Torch version: {torch.__version__}")
 print(f"Cuda available: {torch.cuda.is_available()}")
 print(f"Torch geometric version: {torch_geometric.__version__}")
+
+"""
+NOTE: This file was replaced by dataset_featurizer.py
+but is kept to illustrate how to build a custom dataset in PyG.
+"""
+
 
 class MoleculeDataset(Dataset):
     def __init__(self, root, transform=None, pre_transform=None):
@@ -80,6 +85,15 @@ class MoleculeDataset(Dataset):
             node_feats.append(atom.GetHybridization())
             # Feature 5: Aromaticity
             node_feats.append(atom.GetIsAromatic())
+            # Feature 6: Total Num Hs
+            node_feats.append(atom.GetTotalNumHs())
+            # Feature 7: Radical Electrons
+            node_feats.append(atom.GetNumRadicalElectrons())
+            # Feature 8: In Ring
+            node_feats.append(atom.IsInRing())
+            # Feature 9: Chirality
+            node_feats.append(atom.GetChiralTag())
+
             # Append node features to matrix
             all_node_feats.append(node_feats)
 
@@ -109,7 +123,7 @@ class MoleculeDataset(Dataset):
         """
         We could also use rdmolops.GetAdjacencyMatrix(mol)
         but we want to be sure that the order of the indices
-        matches the order for the edge features
+        matches the order of the edge features
         """
         edge_indices = []
         for bond in mol.GetBonds():
