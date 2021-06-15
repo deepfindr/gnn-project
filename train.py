@@ -25,11 +25,10 @@ print(f"Number of parameters: {count_parameters(model)}")
 model
 
 #%% Loss and Optimizer
-weights = torch.tensor([1, 10], dtype=torch.float32).to(device)
+weights = torch.tensor([1, 4], dtype=torch.float32).to(device)
 loss_fn = torch.nn.CrossEntropyLoss(weight=weights)
-optimizer = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0.9)  
+optimizer = torch.optim.SGD(model.parameters(), lr=0.0001, momentum=0.9)  
 scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
-
 
 #%% Prepare training
 NUM_GRAPHS_PER_BATCH = 256
@@ -46,7 +45,6 @@ def train(epoch):
         # Use GPU
         batch.to(device)  
         # Reset gradients
-
         optimizer.zero_grad() 
         # Passing the node features and the connection info
         pred = model(batch.x.float(), 
@@ -89,8 +87,12 @@ def calculate_metrics(y_pred, y_true, epoch, type):
     print(f"\n Confusion matrix: \n {confusion_matrix(y_pred, y_true)}")
     print(f"F1 Score: {f1_score(y_pred, y_true)}")
     print(f"Accuracy: {accuracy_score(y_pred, y_true)}")
-    print(f"Precision: {precision_score(y_pred, y_true)}")
-    print(f"Recall: {recall_score(y_pred, y_true)}")
+    prec = precision_score(y_pred, y_true)
+    rec = recall_score(y_pred, y_true)
+    print(f"Precision: {prec}")
+    print(f"Recall: {rec}")
+    mlflow.log_metric(key=f"Precision-{type}", value=float(prec), step=epoch)
+    mlflow.log_metric(key=f"Recall-{type}", value=float(rec), step=epoch)
     try:
         roc = roc_auc_score(y_pred, y_true)
         print(f"ROC AUC: {roc}")
@@ -123,3 +125,10 @@ with mlflow.start_run() as run:
 
 # %% Save the model 
 mlflow.pytorch.log_model(model, "model")
+
+# TODO: Scheduler less restrictive
+# TODO: Include edge feats
+# Smaller LR, regularize (dropouts)
+# Edge featz
+# regularization
+# set2set layer
