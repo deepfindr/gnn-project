@@ -11,7 +11,7 @@ start_index = data.iloc[0]["index"]
 # Check how many additional samples we need
 neg_class = data["HIV_active"].value_counts()[0]
 pos_class = data["HIV_active"].value_counts()[1]
-multiplier = int(neg_class/pos_class)
+multiplier = int(neg_class/pos_class) - 1
 
 # Replicate the dataset for the positive class
 replicated_pos = [data[data["HIV_active"] == 1]]*multiplier

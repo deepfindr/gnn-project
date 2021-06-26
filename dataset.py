@@ -1,7 +1,5 @@
 import pandas as pd
-import rdkit
 from rdkit import Chem
-from rdkit.Chem import Draw
 import torch
 import torch_geometric
 from torch_geometric.data import Dataset, Data
@@ -14,17 +12,21 @@ print(f"Cuda available: {torch.cuda.is_available()}")
 print(f"Torch geometric version: {torch_geometric.__version__}")
 
 """
+!!!
 NOTE: This file was replaced by dataset_featurizer.py
 but is kept to illustrate how to build a custom dataset in PyG.
+!!!
 """
 
 
 class MoleculeDataset(Dataset):
-    def __init__(self, root, transform=None, pre_transform=None):
+    def __init__(self, root, filename, test=False, transform=None, pre_transform=None):
         """
         root = Where the dataset should be stored. This folder is split
         into raw_dir (downloaded dataset) and processed_dir (processed data). 
         """
+        self.test = test
+        self.filename = filename
         super(MoleculeDataset, self).__init__(root, transform, pre_transform)
         
     @property
@@ -32,18 +34,24 @@ class MoleculeDataset(Dataset):
         """ If this file exists in raw_dir, the download is not triggered.
             (The download func. is not implemented here)  
         """
-        return 'HIV.csv'
+        return self.filename
 
     @property
     def processed_file_names(self):
         """ If these files are found in raw_dir, processing is skipped"""
-        return 'not_implemented.pt'
+        self.data = pd.read_csv(self.raw_paths[0]).reset_index()
+
+        if self.test:
+            return [f'data_test_{i}.pt' for i in list(self.data.index)]
+        else:
+            return [f'data_{i}.pt' for i in list(self.data.index)]
 
     def download(self):
         pass
 
     def process(self):
         self.data = pd.read_csv(self.raw_paths[0])
+        self.data.index = self.data["index"]
         for index, mol in tqdm(self.data.iterrows(), total=self.data.shape[0]):
             mol_obj = Chem.MolFromSmiles(mol["smiles"])
             # Get node features
@@ -62,7 +70,12 @@ class MoleculeDataset(Dataset):
                         y=label,
                         smiles=mol["smiles"]
                         ) 
-            torch.save(data, 
+            if self.test:
+                torch.save(data, 
+                    os.path.join(self.processed_dir, 
+                                 f'data_test_{index}.pt'))
+            else:
+                torch.save(data, 
                     os.path.join(self.processed_dir, 
                                  f'data_{index}.pt'))
 
@@ -146,8 +159,12 @@ class MoleculeDataset(Dataset):
         """ - Equivalent to __getitem__ in pytorch
             - Is not needed for PyG's InMemoryDataset
         """
-        data = torch.load(os.path.join(self.processed_dir, 
-                                 f'data_{idx}.pt'))
+        if self.test:
+            data = torch.load(os.path.join(self.processed_dir, 
+                                 f'data_test_{idx}.pt'))
+        else:
+            data = torch.load(os.path.join(self.processed_dir, 
+                                 f'data_{idx}.pt'))   
         return data
 
 

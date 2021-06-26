@@ -1,5 +1,7 @@
 #%% imports 
-import torch 
+import torch
+import torch.nn.functional as F 
+from torch.autograd import Variable
 from torch_geometric.data import DataLoader
 from sklearn.metrics import confusion_matrix, f1_score, \
     accuracy_score, precision_score, recall_score, roc_auc_score
@@ -16,7 +18,7 @@ def count_parameters(model):
 
 #%% Loading the dataset
 train_dataset = MoleculeDataset(root="data/", filename="HIV_train_oversampled.csv")
-test_dataset = MoleculeDataset(root="data/", filename="HIV_test.csv")
+test_dataset = MoleculeDataset(root="data/", filename="HIV_test.csv", test=True)
 
 #%% Loading the model
 model = GNN(feature_size=train_dataset[0].x.shape[1]) 
@@ -25,10 +27,16 @@ print(f"Number of parameters: {count_parameters(model)}")
 model
 
 #%% Loss and Optimizer
-weights = torch.tensor([1, 4], dtype=torch.float32).to(device)
-loss_fn = torch.nn.CrossEntropyLoss(weight=weights)
-optimizer = torch.optim.SGD(model.parameters(), lr=0.0001, momentum=0.9)  
-scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
+# < 1 increases precision, > 1 recall
+weight = torch.tensor([1], dtype=torch.float32).to(device)
+loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=weight)
+
+
+optimizer = torch.optim.SGD(model.parameters(), 
+                            lr=0.1,
+                            momentum=0.9,
+                            weight_decay=0.0001)
+scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.995)
 
 #%% Prepare training
 NUM_GRAPHS_PER_BATCH = 256
@@ -41,6 +49,8 @@ def train(epoch):
     # Enumerate over the data
     all_preds = []
     all_labels = []
+    running_loss = 0.0
+    step = 0
     for _, batch in enumerate(tqdm(train_loader)):
         # Use GPU
         batch.to(device)  
@@ -52,35 +62,48 @@ def train(epoch):
                                 batch.edge_index, 
                                 batch.batch) 
         # Calculating the loss and gradients
-        loss = torch.sqrt(loss_fn(pred, batch.y)) 
+        loss = loss_fn(torch.squeeze(pred), batch.y.float())
         loss.backward()  
-        # Update using the gradients
         optimizer.step()  
 
-        all_preds.append(np.argmax(pred.cpu().detach().numpy(), axis=1))
+        # Update tracking
+        running_loss += loss.item()
+        step += 1
+        all_preds.append(np.rint(torch.sigmoid(pred).cpu().detach().numpy()))
         all_labels.append(batch.y.cpu().detach().numpy())
     all_preds = np.concatenate(all_preds).ravel()
     all_labels = np.concatenate(all_labels).ravel()
     calculate_metrics(all_preds, all_labels, epoch, "train")
-    return loss
+    return running_loss/step
 
 def test(epoch):
     all_preds = []
+    all_preds_raw = []
     all_labels = []
+    running_loss = 0.0
+    step = 0
     for batch in test_loader:
         batch.to(device)  
         pred = model(batch.x.float(), 
                         batch.edge_attr.float(),
                         batch.edge_index, 
                         batch.batch) 
-        loss = torch.sqrt(loss_fn(pred, batch.y))    
-        all_preds.append(np.argmax(pred.cpu().detach().numpy(), axis=1))
+        loss = loss_fn(torch.squeeze(pred), batch.y.float())
+
+         # Update tracking
+        running_loss += loss.item()
+        step += 1
+        all_preds.append(np.rint(torch.sigmoid(pred).cpu().detach().numpy()))
+        all_preds_raw.append(torch.sigmoid(pred).cpu().detach().numpy())
         all_labels.append(batch.y.cpu().detach().numpy())
     
     all_preds = np.concatenate(all_preds).ravel()
     all_labels = np.concatenate(all_labels).ravel()
+    print(all_preds_raw[0][:10])
+    print(all_preds[:10])
+    print(all_labels[:10])
     calculate_metrics(all_preds, all_labels, epoch, "test")
-    return loss
+    return running_loss/step
 
 
 def calculate_metrics(y_pred, y_true, epoch, type):
@@ -107,7 +130,6 @@ with mlflow.start_run() as run:
         # Training
         model.train()
         loss = train(epoch=epoch)
-        loss = loss.detach().cpu().numpy()
         print(f"Epoch {epoch} | Train Loss {loss}")
         mlflow.log_metric(key="Train loss", value=float(loss), step=epoch)
 
@@ -115,7 +137,6 @@ with mlflow.start_run() as run:
         model.eval()
         if epoch % 5 == 0:
             loss = test(epoch=epoch)
-            loss = loss.detach().cpu().numpy()
             print(f"Epoch {epoch} | Test Loss {loss}")
             mlflow.log_metric(key="Test loss", value=float(loss), step=epoch)
     
@@ -126,9 +147,3 @@ with mlflow.start_run() as run:
 # %% Save the model 
 mlflow.pytorch.log_model(model, "model")
 
-# TODO: Scheduler less restrictive
-# TODO: Include edge feats
-# Smaller LR, regularize (dropouts)
-# Edge featz
-# regularization
-# set2set layer
