@@ -51,7 +51,6 @@ class MoleculeDataset(Dataset):
 
     def process(self):
         self.data = pd.read_csv(self.raw_paths[0])
-        self.data.index = self.data["index"]
         for index, mol in tqdm(self.data.iterrows(), total=self.data.shape[0]):
             mol_obj = Chem.MolFromSmiles(mol["smiles"])
             # Get node features
