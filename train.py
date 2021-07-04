@@ -187,15 +187,3 @@ tuner = Tuner(HYPERPARAMETERS,
               objective=run_one_training,
               conf_dict=config) 
 results = tuner.minimize()
-    
-
-
-
-# Try:
-# - Activation function
-# - l2 regularization 
-# Check relu in GNN layers?
-
-
-# I already tried focal loss
-# PUSH EXPERIMENTS TO MASTER!!!
