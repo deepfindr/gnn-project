@@ -13,6 +13,11 @@ import seaborn as sns
 import pandas as pd 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+# Specify tracking server
+mlflow.set_tracking_uri("http://localhost:5000")
+
+
+
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
@@ -107,7 +112,7 @@ def calculate_metrics(y_pred, y_true, epoch, type):
 
 # %% Run the training
 from mango import scheduler, Tuner
-from config import HYPERPARAMETERS, BEST_PARAMETERS
+from config import HYPERPARAMETERS, BEST_PARAMETERS, SIGNATURE
 
 def run_one_training(params):
     params = params[0]
@@ -165,7 +170,7 @@ def run_one_training(params):
                     if float(loss) < best_loss:
                         best_loss = loss
                         # Save the currently best model 
-                        mlflow.pytorch.log_model(model, "model")
+                        mlflow.pytorch.log_model(model, "model", signature=SIGNATURE)
                         early_stopping_counter = 0
                     else:
                         early_stopping_counter += 1
