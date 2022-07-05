@@ -94,16 +94,16 @@ def log_conf_matrix(y_pred, y_true, epoch):
 
 def calculate_metrics(y_pred, y_true, epoch, type):
     print(f"\n Confusion matrix: \n {confusion_matrix(y_pred, y_true)}")
-    print(f"F1 Score: {f1_score(y_pred, y_true)}")
-    print(f"Accuracy: {accuracy_score(y_pred, y_true)}")
-    prec = precision_score(y_pred, y_true)
-    rec = recall_score(y_pred, y_true)
+    print(f"F1 Score: {f1_score(y_true, y_pred)}")
+    print(f"Accuracy: {accuracy_score(y_true, y_pred)}")
+    prec = precision_score(y_true, y_pred)
+    rec = recall_score(y_true, y_pred)
     print(f"Precision: {prec}")
     print(f"Recall: {rec}")
     mlflow.log_metric(key=f"Precision-{type}", value=float(prec), step=epoch)
     mlflow.log_metric(key=f"Recall-{type}", value=float(rec), step=epoch)
     try:
-        roc = roc_auc_score(y_pred, y_true)
+        roc = roc_auc_score(y_true, y_pred)
         print(f"ROC AUC: {roc}")
         mlflow.log_metric(key=f"ROC-AUC-{type}", value=float(roc), step=epoch)
     except:
