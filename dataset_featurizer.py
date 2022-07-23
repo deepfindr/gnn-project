@@ -6,6 +6,7 @@ import numpy as np
 import os
 from tqdm import tqdm
 import deepchem as dc
+from rdkit import Chem 
 
 print(f"Torch version: {torch.__version__}")
 print(f"Cuda available: {torch.cuda.is_available()}")
@@ -45,12 +46,13 @@ class MoleculeDataset(Dataset):
     def process(self):
         self.data = pd.read_csv(self.raw_paths[0]).reset_index()
         featurizer = dc.feat.MolGraphConvFeaturizer(use_edges=True)
-        for index, mol in tqdm(self.data.iterrows(), total=self.data.shape[0]):
+        for index, data in tqdm(self.data.iterrows(), total=self.data.shape[0]):
             # Featurize molecule
-            f = featurizer.featurize(mol["smiles"])
-            data = f[0].to_pyg_graph()
-            data.y = self._get_label(mol["HIV_active"])
-            data.smiles = mol["smiles"]
+            mol = Chem.MolFromSmiles(data["smiles"])
+            f = featurizer._featurize(mol)
+            data = f.to_pyg_graph()
+            data.y = self._get_label(data["HIV_active"])
+            data.smiles = data["smiles"]
             if self.test:
                 torch.save(data, 
                     os.path.join(self.processed_dir, 
