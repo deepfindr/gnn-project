@@ -46,13 +46,13 @@ class MoleculeDataset(Dataset):
     def process(self):
         self.data = pd.read_csv(self.raw_paths[0]).reset_index()
         featurizer = dc.feat.MolGraphConvFeaturizer(use_edges=True)
-        for index, data in tqdm(self.data.iterrows(), total=self.data.shape[0]):
+        for index, row in tqdm(self.data.iterrows(), total=self.data.shape[0]):
             # Featurize molecule
-            mol = Chem.MolFromSmiles(data["smiles"])
+            mol = Chem.MolFromSmiles(row["smiles"])
             f = featurizer._featurize(mol)
             data = f.to_pyg_graph()
-            data.y = self._get_label(data["HIV_active"])
-            data.smiles = data["smiles"]
+            data.y = self._get_label(row["HIV_active"])
+            data.smiles = row["smiles"]
             if self.test:
                 torch.save(data, 
                     os.path.join(self.processed_dir, 
